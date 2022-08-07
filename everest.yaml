@@ -1,0 +1,6 @@
+- Name: HardcoreMode
+  Version: 1.0.9
+  DLL: Code/HardcoreMode.dll
+  Dependencies:
+    - Name: Everest
+      Version: 1.3070.0

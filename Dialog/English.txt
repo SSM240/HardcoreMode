@@ -1,0 +1,25 @@
+# Option names
+    MODOPTIONS_HM_HARDCOREICON=              Hardcore Icon
+    MODOPTIONS_HM_HARDCOREICON_TRANSPARENT=  Translucent
+    
+    MODOPTIONS_HM_ICONPOSITION=              Icon Position
+    MODOPTIONS_HM_ICONPOSITION_BOTTOMLEFT=   Bottom Left
+    MODOPTIONS_HM_ICONPOSITION_BOTTOMRIGHT=  Bottom Right
+    MODOPTIONS_HM_ICONPOSITION_TOPRIGHT=     Top Right
+    
+    MODOPTIONS_HM_QUICKHARDCORETOGGLE=       Quick Hardcore Toggle
+    
+    MODOPTIONS_HM_ALWAYSSPAWNGOLDENS=        Always Spawn Goldens
+
+# Pause menu text
+    MENU_HARDCORE_NORMAL=         Return to safe ground to access the full menu
+    MENU_HARDCORE_QUICKRESTART=   Return to safe ground to quick restart
+
+# File creation
+    FILE_HARDCORE_OFF=      Hardcore Mode : OFF
+    FILE_HARDCORE_ON=       Hardcore Mode : ON
+    FILE_HARDCORE_TOGGLE=   Toggle Hardcore Mode
+
+# Game over screen
+    HARDCORE_GAMEOVER=  GAME OVER
+    HARDCORE_DIED_ON=   Died on:
