@@ -2,6 +2,7 @@
 using Monocle;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Celeste.Mod.HardcoreMode
 {
@@ -109,7 +110,7 @@ namespace Celeste.Mod.HardcoreMode
 
         private int totalCassettes;
 
-        public Vector2 IdlePosition => new Vector2(960f, 525 + 310 * (FileSlot - 1));
+        public Vector2 IdlePosition => new Vector2(960f, 525 + 310 * 0);
 
         public Vector2 SelectedPosition => new Vector2(960f, 440f);
 
@@ -223,11 +224,17 @@ namespace Celeste.Mod.HardcoreMode
 
         private void Setup()
         {
-            string text = "portrait_madeline";
-            string id = HMModule.hardcorePortrait;
-            Portrait = GFX.PortraitsSpriteBank.Create(text);
-            Portrait.Play(id);
-            Portrait.Scale = Vector2.One * (200f / (float)GFX.PortraitsSpriteBank.SpriteData[text].Sources[0].XML.AttrInt("size", 160));
+            // trying activating the hooks of 'OuiFileSelectSlot.SetUp' who that have "(FileSlot == 0)" as condition.
+            new OuiFileSelectSlot(0, null, false);
+
+            // Get SaveFile's portrait. be like... they may be modified by other mods, such as SaveFilePortraits.
+            Portrait = new OuiFileSelectSlot(FileSlot, null, SaveData).Portrait;
+
+            // We no longer need the SaveFilePortraits data now, so let's to really delete it.
+            SaveData.TryDeleteModSaveData(FileSlot);
+
+            HMModule.HardcorePortrait(Portrait);
+
             Add(Portrait);
         }
 
@@ -402,7 +409,7 @@ namespace Celeste.Mod.HardcoreMode
         {
             Ticket.Update();
             Card.Update();
-            
+
             if (highlightEaseDelay <= 0f)
             {
                 highlightEase = Calc.Approach(highlightEase, 1f, Engine.DeltaTime * 4f);

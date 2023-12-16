@@ -17,7 +17,17 @@ namespace Celeste.Mod.HardcoreMode
     {
         #region Fields
 
-        public const string hardcorePortrait = "idle_distracted";
+        public static void HardcorePortrait(Sprite sprite)
+        {
+            sprite.Play("idle_normal");
+            if (sprite.Has("idle_distracted")) /* Madeline */ { sprite.Play("idle_distracted"); }
+            else if (sprite.Has("idle_upset")) /* Badeline */ { sprite.Play("idle_upset"); }
+            else if (sprite.Has("idle_wtf")) /* Theo */ { sprite.Play("idle_wtf"); }
+            else if (sprite.Has("idle_creepB")) /* Granny */ { sprite.Play("idle_creepB"); }
+            else if (sprite.Has("idle_nervous")) /* Oshiro */ { sprite.Play("idle_nervous"); }
+            else if (sprite.Has("idle_concerned")) /* Mom */ { sprite.Play("idle_concerned"); }
+        }
+        
 
         // dying in these states will not result in a hardcore death
         public static readonly int[] NoControlStates = new int[]
@@ -60,6 +70,11 @@ namespace Celeste.Mod.HardcoreMode
 
         private ILHook silverBerryHook;
 
+        private ILHook DeleteModSaveDataHook;
+
+        private readonly MethodInfo DeleteModSaveDataInfo = typeof(SaveData).GetMethod("TryDeleteModSaveData",
+            BindingFlags.Static | BindingFlags.Public);
+
         #endregion
 
         #region Module setup
@@ -92,6 +107,7 @@ namespace Celeste.Mod.HardcoreMode
             On.Celeste.PlayerDeadBody.Awake += On_PlayerDeadBody_Awake;
             On.Celeste.PlayerDeadBody.End += On_PlayerDeadBody_End;
             On.Celeste.SaveData.TryDelete += On_SaveData_TryDelete;
+            DeleteModSaveDataHook = new ILHook(DeleteModSaveDataInfo, IL_TryDeleteModSaveData);
             deathRoutineHook = new ILHook(deathRoutineInfo, IL_DeathRoutine);
             Everest.Events.FileSelectSlot.OnCreateButtons += FileSelectSlot_OnCreateButtons;
             On.Celeste.OuiFileSelectSlot.Setup += On_OuiFileSelectSlot_Setup;
@@ -134,6 +150,7 @@ namespace Celeste.Mod.HardcoreMode
             On.Celeste.PlayerDeadBody.Awake -= On_PlayerDeadBody_Awake;
             On.Celeste.PlayerDeadBody.End -= On_PlayerDeadBody_End;
             On.Celeste.SaveData.TryDelete -= On_SaveData_TryDelete;
+            DeleteModSaveDataHook?.Dispose();
             deathRoutineHook?.Dispose();
             Everest.Events.FileSelectSlot.OnCreateButtons -= FileSelectSlot_OnCreateButtons;
             On.Celeste.OuiFileSelectSlot.Setup -= On_OuiFileSelectSlot_Setup;
@@ -433,12 +450,18 @@ namespace Celeste.Mod.HardcoreMode
         /// <param name="orig">The original method.</param>
         /// <param name="self">The current PlayerDeadBody instance.</param>
         /// <param name="scene">The current scene.</param>
+        /// 
+        bool FilterNeedsDatas = false;
         public void On_PlayerDeadBody_Awake(On.Celeste.PlayerDeadBody.orig_Awake orig, PlayerDeadBody self, Scene scene)
         {
             currentPlayerDeadBody = self;
             if (IsHardcoreDeath(self))
             {
+                // We'll need the SaveFilePortraits data later, so use this sure it doesn't get deleted for now.
+                FilterNeedsDatas = true;
                 SaveData.TryDelete(SaveData.Instance.FileSlot);  // spooky!
+                FilterNeedsDatas = false;
+
                 DynData<PlayerDeadBody> deadBodyData = new DynData<PlayerDeadBody>(self);
                 Vector2 bounce = deadBodyData.Get<Vector2>("bounce");
                 if (bounce != Vector2.Zero)
@@ -464,7 +487,6 @@ namespace Celeste.Mod.HardcoreMode
             }
             orig(self, scene);
         }
-
         /// <summary>
         /// Routine that gradually slows down the game.
         /// </summary>
@@ -621,9 +643,9 @@ namespace Celeste.Mod.HardcoreMode
         public void On_OuiFileSelectSlot_Setup(On.Celeste.OuiFileSelectSlot.orig_Setup orig, OuiFileSelectSlot self)
         {
             orig(self);
-            if (IsHardcoreFile(self.FileSlot))
+            if (IsHardcoreFile(self.FileSlot) && self.Portrait.CurrentAnimationID == "idle_normal")
             {
-                self.Portrait.Play(hardcorePortrait);
+                HardcorePortrait(self.Portrait);
             }
         }
 
@@ -725,6 +747,7 @@ namespace Celeste.Mod.HardcoreMode
         /// Called when toggleButton is pressed.
         /// Toggles Hardcore Mode for the currently selected file.
         /// </summary>
+        public string animation_record = "";
         private void OnHardcoreToggleSelected()
         {
             int index = currentSlot.FileSlot;
@@ -733,14 +756,16 @@ namespace Celeste.Mod.HardcoreMode
                 HardcoreFiles[index] = true;
                 toggleButton.Label = Dialog.Clean("FILE_HARDCORE_ON");
                 Audio.Play("event:/ui/main/button_toggle_on");
-                currentSlot.Portrait.Play(hardcorePortrait);
+                animation_record = currentSlot.Portrait.CurrentAnimationID;
+                HardcorePortrait(currentSlot.Portrait);
+
             }
             else
             {
                 HardcoreFiles[index] = false;
                 toggleButton.Label = Dialog.Clean("FILE_HARDCORE_OFF");
                 Audio.Play("event:/ui/main/button_toggle_off");
-                currentSlot.Portrait.Play("idle_normal");
+                if (currentSlot.Portrait.Has(animation_record)) { currentSlot.Portrait.Play(animation_record); }
             }
         }
 
@@ -911,10 +936,32 @@ namespace Celeste.Mod.HardcoreMode
             if (result)
             {
                 HardcoreFiles[slot] = false;
+                WriteSaveData(slot, null);
             }
             return result;
         }
-
+        public void IL_TryDeleteModSaveData(ILContext il)
+        {
+            ILCursor cursor = new ILCursor(il);
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdsfld(typeof(Everest), "_Modules")))
+            {
+                cursor.EmitDelegate<Func<List<EverestModule>, List<EverestModule>>>((orig) =>
+                {
+                    if (FilterNeedsDatas)
+                    {
+                        Logger.Log(LogLevel.Info, "HardcoreMode", $"Trying to keep needs data when save No.{currentSlot.FileSlot} is deleting.");
+                        orig = new List<EverestModule>(orig); //Make a clone to prevent game be breaking.
+                        EverestModule obj = null;
+                        foreach (EverestModule mod in orig)
+                        {   // Make sure the SaveFilePortraits data is not deleted at this time, it working need that.
+                            if (mod.GetType().FullName == "Celeste.Mod.SaveFilePortraits.SaveFilePortraitsModule") { obj = mod; }
+                        }
+                        if (obj != null) { orig.Remove(obj); }
+                    }
+                    return orig;
+                });
+            }
+        }
         #endregion
     }
 }

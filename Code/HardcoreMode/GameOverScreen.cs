@@ -35,7 +35,7 @@ namespace Celeste.Mod.HardcoreMode
             deleteButtonMenu.Add(new TextMenu.Header(""));
             deleteButtonMenu.Add(deleteButton = new TextMenu.Button(""));
             deleteButtonMenu.Add(deathInfo = new TextMenu.SubHeader(" "));
-            fakeSlot = new FakeFileSelectSlot(1, saveData);
+            fakeSlot = new FakeFileSelectSlot(saveData.FileSlot, saveData);
             Add(fakeSlot);
             fadeWipe = new FadeWipe(this, wipeIn: true);
             fakeSlot.Add(new Coroutine(GameOverRoutine()));
